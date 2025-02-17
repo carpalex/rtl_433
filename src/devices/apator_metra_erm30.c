@@ -81,6 +81,7 @@ etc., but they were not (yet) identified
 #define CRC_LEN 2
 #define LEN_LEN 1
 
+#define CRC_STR_LEN 13
 #define ID_STR_LEN 9
 #define VOL_STR_LEN 9
 #define DATE_STR_LEN 10
@@ -168,6 +169,12 @@ static int apator_metra_erm30_decode(r_device *decoder, bitbuffer_t *bitbuffer)
     char date_str[DATE_STR_LEN + 1];
     sprintf(date_str, "%04d-%02d-%02d", 2000 + year, month, day);
 
+    char payload_str[2 * MAX_LEN + 1];
+    build_partial_decr_payload_str(len, payload_decr, decr_mask, payload_str);
+
+    char frame_str[BIT_LEN_STR_LEN + 2 * (MAX_LEN + CRC_LEN + LEN_LEN) + 1];
+    build_raw_frame_str(len, frame, frame_str);
+
     /* clang-format off */
     data_t *data = data_make(
         "model",           "",                         DATA_STRING, "ApatorMetra-ERM30",
@@ -190,6 +197,8 @@ static char const *const output_fields[] = {
     "volume_m3",
     "date",
     "mic",
+    "payload",
+    "raw",
     NULL,
 };
 
