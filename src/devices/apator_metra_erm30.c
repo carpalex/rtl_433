@@ -62,6 +62,8 @@ static void decrypt_payload(uint8_t plen, uint8_t *payload_encr, uint8_t *payloa
 static void extract_id(uint8_t *p, uint8_t *m, char *id_str);
 static void extract_volume(uint8_t *p, uint8_t *m, char *volume_str);
 static void extract_date(uint8_t *p, uint8_t *m, char *date_str);
+static void build_partial_decr_payload_str(uint8_t plen, uint8_t *payload,  uint8_t *decr_mask, char *payload_str);
+static void build_raw_frame_str(uint8_t plen, uint8_t *frame, char *frame_str);
 
 static int apator_metra_erm30_decode(r_device *decoder, bitbuffer_t *bitbuffer)
 {
@@ -114,6 +116,12 @@ static int apator_metra_erm30_decode(r_device *decoder, bitbuffer_t *bitbuffer)
     char date[DATE_STR_LEN + 1];
     extract_date(payload_decr, decr_mask, date);
 
+    char payload_str[2 * MAX_LEN + 1];
+    build_partial_decr_payload_str(len, payload_decr, decr_mask, payload_str);
+
+    char frame_str[BIT_LEN_STR_LEN + 2 * (MAX_LEN + CRC_LEN + LEN_LEN) + 1];
+    build_raw_frame_str(len, frame, frame_str);
+
     /* clang-format off */
     data_t *data = data_make(
         "model",        "",                         DATA_STRING,    "Apator Metra E-RM 30",
@@ -122,6 +130,8 @@ static int apator_metra_erm30_decode(r_device *decoder, bitbuffer_t *bitbuffer)
         "volume_m3",    "Volume",                   DATA_STRING,    volume,
         "date",         "Date",                     DATA_STRING,    date,
         "mic",          "Integrity",                DATA_STRING,    crc_str,
+        "payload",      "Payload",                  DATA_STRING,    payload_str,
+        "raw",          "Raw frame",                DATA_STRING,    frame_str,
         NULL);
     /* clang-format on */
 
@@ -136,6 +146,8 @@ static char const *const output_fields[] = {
     "volume_m3",
     "date",
     "mic",
+    "payload",
+    "raw",
     NULL,
 };
 
@@ -257,4 +269,28 @@ static void extract_date(uint8_t *p, uint8_t *m, char *date_str)
     } else {
         sprintf(date_str, "%s-%s-%s", "????", "??", "??");
     }
+}
+
+static void build_partial_decr_payload_str(uint8_t plen, uint8_t *payload,  uint8_t *decr_mask, char *payload_str)
+{
+    for (int i = 0; i < 2 * plen; i++) {
+        unsigned int bitshift = (i % 2) ? 0 : 4;
+        uint8_t payload_nibble = (payload[i / 2] >> bitshift) & 0x0f;
+        uint8_t mask_nibble = (decr_mask[i / 2] >> bitshift) & 0x0f ;
+
+        if (mask_nibble == 0x0) {
+            sprintf(payload_str + i, "%1x", payload_nibble);
+        } else {
+            sprintf(payload_str + i, "?");
+        }
+    }
+}
+
+static void build_raw_frame_str(uint8_t plen, uint8_t *frame, char *frame_str)
+{
+    char payload_str[2 * (MAX_LEN + CRC_LEN + LEN_LEN)];
+    for (int i = 0; i < plen + CRC_LEN + LEN_LEN; i++) {
+        sprintf(payload_str + (i * 2), "%02x", frame[i]);
+    }
+    sprintf(frame_str, "{%d}%s", 8 * (plen + CRC_LEN + LEN_LEN), payload_str);
 }
